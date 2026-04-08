@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Controle de Estoque</title>
+    <link rel="stylesheet" href="admin-style.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h1>📦 Estoque</h1>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-page="dashboard">
+                <span class="icon">📊</span>
+                <span>Dashboard</span>
+            </a>
+            <a href="#" class="nav-item" data-page="products">
+                <span class="icon">📦</span>
+                <span>Produtos</span>
+            </a>
+            <a href="#" class="nav-item" data-page="settings">
+                <span class="icon">⚙️</span>
+                <span>Configurações</span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar">👤</div>
+                <div class="user-details">
+                    <p class="user-name" id="sidebarUserName">Admin</p>
+                    <p class="user-role" id="sidebarUserRole">Administrador</p>
+                </div>
+            </div>
+            <button class="btn-logout" onclick="handleLogout()">Sair</button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Header Top -->
+        <header class="top-header">
+            <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+            <div class="header-title">
+                <h2 id="pageTitle">Dashboard</h2>
+            </div>
+            <div class="header-user">
+                <span id="headerUserDisplay"></span>
+                <span class="logout-time" id="logoutTime"></span>
+            </div>
+        </header>
+
+        <!-- Message Area -->
+        <div id="messageArea" class="message-area" style="display: none;"></div>
+
+        <!-- Dashboard Page -->
+        <section id="dashboardPage" class="page active">
+            <!-- Métricas -->
+            <div class="metrics-grid">
+                <div class="metric-card metric-total">
+                    <div class="metric-icon">📊</div>
+                    <div class="metric-content">
+                        <p class="metric-label">Total de Produtos</p>
+                        <p class="metric-value" id="metricTotal">0</p>
+                    </div>
+                </div>
+
+                <div class="metric-card metric-stock">
+                    <div class="metric-icon">📦</div>
+                    <div class="metric-content">
+                        <p class="metric-label">Quantidade em Estoque</p>
+                        <p class="metric-value" id="metricQuantity">0</p>
+                    </div>
+                </div>
+
+                <div class="metric-card metric-value">
+                    <div class="metric-icon">💰</div>
+                    <div class="metric-content">
+                        <p class="metric-label">Valor Total em Estoque</p>
+                        <p class="metric-value" id="metricValue">R$ 0,00</p>
+                    </div>
+                </div>
+
+                <div class="metric-card metric-warning">
+                    <div class="metric-icon">⚠️</div>
+                    <div class="metric-content">
+                        <p class="metric-label">Produtos com Estoque Baixo</p>
+                        <p class="metric-value" id="metricLowStock">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resumo Rápido -->
+            <div class="quick-stats">
+                <div class="stat-item">
+                    <h3>Últimas Atualizações</h3>
+                    <div id="recentChanges" class="recent-list">
+                        <p style="color: #999;">Nenhuma atualização recente</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Products Page -->
+        <section id="productsPage" class="page">
+            <!-- Toolbar -->
+            <div class="toolbar">
+                <input type="text" id="searchInput" class="search-box" placeholder="🔍 Buscar produtos...">
+                <button class="btn btn-primary" onclick="openProductModal()">+ Novo Produto</button>
+            </div>
+
+            <!-- Products Table -->
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="col-id">ID</th>
+                            <th class="col-name">Produto</th>
+                            <th class="col-price">Preço</th>
+                            <th class="col-quantity">Estoque</th>
+                            <th class="col-value">Valor Total</th>
+                            <th class="col-actions">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productsTableBody">
+                        <tr>
+                            <td colspan="6" style="text-align: center; color: #999;">Carregando produtos...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Settings Page -->
+        <section id="settingsPage" class="page">
+            <div class="settings-container">
+                <div class="settings-card">
+                    <h3>Configurações do Sistema</h3>
+                    <p>Versão: 1.0.0</p>
+                    <p>Banco de Dados: SQLite</p>
+                    <p>Última sincronização: <span id="lastSync">-</span></p>
+                </div>
+
+                <div class="settings-card">
+                    <h3>Gerenciamento de Usuários</h3>
+                    <button class="btn btn-secondary" onclick="openUserModal()">Criar Novo Usuário</button>
+                </div>
+
+                <div class="settings-card danger">
+                    <h3>Zona de Perigo</h3>
+                    <button class="btn btn-danger" onclick="exportDatabase()">Exportar Dados</button>
+                    <button class="btn btn-danger" onclick="clearCache()">Limpar Cache</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal: Produto -->
+    <div id="productModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Novo Produto</h2>
+                <button class="modal-close" onclick="closeProductModal()">&times;</button>
+            </div>
+            <form id="productForm" onsubmit="handleProductSubmit(event)">
+                <div class="form-group">
+                    <label for="productName">Nome do Produto *</label>
+                    <input type="text" id="productName" required placeholder="Ex: Teclado USB">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="productPrice">Preço (R$) *</label>
+                        <input type="number" id="productPrice" required step="0.01" min="0" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="productQuantity">Quantidade *</label>
+                        <input type="number" id="productQuantity" required min="0" placeholder="0">
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeProductModal()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="btn-text">Salvar Produto</span>
+                        <span class="btn-loading" style="display: none;">Salvando...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Confirmar Exclusão -->
+    <div id="deleteModal" class="modal" style="display: none;">
+        <div class="modal-content modal-delete">
+            <div class="modal-header">
+                <h2>Confirmar Exclusão</h2>
+                <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+            </div>
+            <p id="deleteMessage">Tem certeza que deseja excluir este produto?</p>
+            <p style="font-size: 0.9em; color: #999;">Esta ação não pode ser desfeita.</p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancelar</button>
+                <button class="btn btn-danger" onclick="confirmDeleteProduct()">Excluir Produto</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin-script.js"></script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Funcionário - Controle de Estoque</title>
+    <link rel="stylesheet" href="employee-style.css">
+</head>
+<body>
+    <!-- Main Dashboard -->
+    <div id="mainScreen" class="main-screen">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1>📦 Controle de Estoque</h1>
+            </div>
+            <div class="header-center">
+                <input type="text" id="searchInput" class="search-box" placeholder="🔍 Buscar produtos...">
+            </div>
+            <div class="header-right">
+                <div class="user-info">
+                    <span id="userName">Funcionário</span>
+                    <button class="btn-logout" onclick="handleLogout()">Sair</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Message Area -->
+        <div id="messageArea" class="message-area" style="display: none;"></div>
+
+        <!-- Quick Stats -->
+        <div class="quick-stats">
+            <div class="stat-card">
+                <span class="stat-icon">📊</span>
+                <div class="stat-info">
+                    <p class="stat-label">Total de Produtos</p>
+                    <p class="stat-value" id="totalProducts">0</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-icon">⚠️</span>
+                <div class="stat-info">
+                    <p class="stat-label">Estoque Baixo</p>
+                    <p class="stat-value" id="lowStockProducts">0</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-icon">📦</span>
+                <div class="stat-info">
+                    <p class="stat-label">Quantidade Total</p>
+                    <p class="stat-value" id="totalQuantity">0</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Products Grid -->
+        <div class="products-container">
+            <div id="productsGrid" class="products-grid">
+                <div class="loading">Carregando produtos...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmar Saída -->
+    <div id="outModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📤 Saída de Produto</h2>
+                <button class="modal-close" onclick="closeOutModal()">&times;</button>
+            </div>
+            <p id="outModalMessage">Quantos produtos deseja remover?</p>
+            <div class="quantity-selector">
+                <button type="button" class="qty-btn" onclick="decreaseQtyOut()">-</button>
+                <input type="number" id="outQuantity" value="1" min="1" readonly>
+                <button type="button" class="qty-btn" onclick="increaseQtyOut()">+</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeOutModal()">Cancelar</button>
+                <button class="btn btn-danger" onclick="confirmOut()">Remover</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmar Entrada -->
+    <div id="inModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📥 Entrada de Produto</h2>
+                <button class="modal-close" onclick="closeInModal()">&times;</button>
+            </div>
+            <p id="inModalMessage">Quantos produtos deseja adicionar?</p>
+            <div class="quantity-selector">
+                <button type="button" class="qty-btn" onclick="decreaseQtyIn()">-</button>
+                <input type="number" id="inQuantity" value="1" min="1" readonly>
+                <button type="button" class="qty-btn" onclick="increaseQtyIn()">+</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeInModal()">Cancelar</button>
+                <button class="btn btn-success" onclick="confirmIn()">Adicionar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="employee-script.js"></script>
+</body>
+</html>
