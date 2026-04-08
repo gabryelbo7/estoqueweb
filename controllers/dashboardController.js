@@ -8,8 +8,10 @@ const { dbGet, dbAll } = require('../database');
  */
 const getDashboard = async (req, res) => {
     try {
-        // Executar as 3 queries em paralelo para melhor performance
-        const [totalStats, estockValue, lowStockProducts] = await Promise.all([
+        // Executar as 3 queries em paralelo para melhor performance.
+        // Promise.all dispara todas as consultas ao mesmo tempo. O tempo total é determinado pela consulta mais lenta,
+        // então o painel carrega mais rápido do que executar cada query sequencialmente, aguardando uma por vez.
+        const [totalStats, stockValue, lowStockProducts] = await Promise.all([
             // Query 1: Total de produtos
             dbGet('SELECT COUNT(*) as totalProdutos FROM products'),
             
@@ -24,14 +26,13 @@ const getDashboard = async (req, res) => {
                  ORDER BY quantity ASC`
             )
         ]);
-
         // Preparar dados da resposta
         const dashboardData = {
             success: true,
             timestamp: new Date().toISOString(),
             summary: {
                 totalProdutos: totalStats?.totalProdutos || 0,
-                valorTotalEstoque: estockValue?.valorTotalEstoque || 0,
+                valorTotalEstoque: stockValue?.valorTotalEstoque || 0,
                 produtosComEstoqueBaixo: (lowStockProducts || []).length
             },
             details: {

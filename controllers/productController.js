@@ -130,26 +130,31 @@ const createProduct = async (req, res) => {
 
         const productId = insertResult.lastID;
 
-        // 2️⃣ Se quantidade > 0, registrar movimentação IMEDIATAMENTE (sem esperar)
-        // Executar em paralelo com o resto
-        if (quantity > 0) {
-            dbRun(
+        // 2️⃣ Registrar movimentação e log em paralelo, sem bloquear a resposta
+        const stockMovementPromise = quantity > 0
+            ? dbRun(
                 'INSERT INTO stock_movements (product_id, type, quantity) VALUES (?, ?, ?)',
                 [productId, 'IN', quantity]
-            ).catch(err => console.error('⚠️ Erro ao registrar movimentação:', err.message));
-        }
+            ).catch(err => console.error('⚠️ Erro ao registrar movimentação:', err.message))
+            : Promise.resolve();
 
-        // 3️⃣ Registrar log de auditoria (sem bloquear a resposta)
-        logAudit(
+        const auditPromise = logAudit(
             req.user.id,
             'CREATE',
             'products',
             productId,
             null,
             { name: name.trim(), quantity, price }
-        ).catch(err => console.error('⚠️ Erro ao registrar log:', err.message));
+        );
 
-        // ✅ Responder ao cliente IMEDIATAMENTE
+        Promise.allSettled([stockMovementPromise, auditPromise]).then(results => {
+            const failed = results.filter(r => r.status === 'rejected');
+            if (failed.length > 0) {
+                failed.forEach(r => console.error('⚠️ Erro assíncrono pós-criação:', r.reason?.message || r.reason));
+            }
+        });
+
+        // ✅ Responder ao cliente imediatamente
         res.status(201).json({
             success: true,
             message: 'Produto adicionado com sucesso',
