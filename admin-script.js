@@ -96,7 +96,7 @@ function showPage(pageName) {
     if (pageName === 'products') {
         loadProducts();
     } else if (pageName === 'dashboard') {
-        updateMetrics();
+        initDashboard();
     }
 
     // Fechar sidebar em mobile
@@ -110,9 +110,11 @@ function showPage(pageName) {
 // DASHBOARD - INICIALIZAÇÃO E FETCH
 // ========================================
 
+/**
+ * Busca dados do servidor e preenche o Dashboard
+ */
 async function initDashboard() {
     try {
-        // Busca dados consolidados da rota de dashboard
         const response = await fetch('/api/dashboard', {
             headers: getAuthHeaders()
         });
@@ -120,64 +122,34 @@ async function initDashboard() {
         if (!response.ok) throw new Error('Falha ao carregar dados do dashboard');
 
         const result = await response.json();
-        const data = result.data;
-
-        // Atualiza os cards com os dados vindos da API
-        document.getElementById('metricTotal').textContent = data.totalProducts || 0;
-        document.getElementById('metricQuantity').textContent = data.totalQuantity || 0;
         
-        // Garante a formatação de moeda brasileira
-        const valorTotal = data.totalValue || 0;
-        document.getElementById('metricValue').textContent = data.totalValueFormatted || 
-            valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        // Mapeamento dos campos conforme retorno do dashboardController.js
+        const summary = result.summary || {};
+        const details = result.details || {};
 
-        document.getElementById('metricLowStock').textContent = data.lowStockCount || 0;
+        // Atualiza os cards de métricas
+        document.getElementById('metricTotal').textContent = summary.totalProdutos || 0;
+        
+        // Calculamos a quantidade total (pode ser enviada pelo backend ou calculada aqui)
+        // Se o backend não enviar o total bruto, podemos usar o count total vindo de loadProducts se necessário
+        document.getElementById('metricQuantity').textContent = details.totalLinhasEstoque || 0;
 
-        // Atualiza a lista visual de mudanças recentes
-        updateRecentChanges();
-    } catch (error) {
-        console.error('Erro ao inicializar dashboard:', error);
-        // Fallback: Se a rota de dashboard falhar, tentamos carregar via produtos
-        loadProducts();
-    }
-}
-
-// ========================================
-// DASHBOARD - INICIALIZAÇÃO E FETCH
-// ========================================
-
-async function initDashboard() {
-    try {
-        // Busca dados consolidados da rota de dashboard
-        const response = await fetch('/api/dashboard', {
-            headers: getAuthHeaders()
+        // Valor total formatado
+        const valorTotal = summary.valorTotalEstoque || 0;
+        document.getElementById('metricValue').textContent = valorTotal.toLocaleString('pt-BR', { 
+            style: 'currency', 
+            currency: 'BRL' 
         });
 
-        if (!response.ok) throw new Error('Falha ao carregar dados do dashboard');
+        document.getElementById('metricLowStock').textContent = summary.produtosComEstoqueBaixo || 0;
 
-        const result = await response.json();
-        const data = result.data;
-
-        // Atualiza os cards com os dados vindos da API
-        document.getElementById('metricTotal').textContent = data.totalProducts || 0;
-        document.getElementById('metricQuantity').textContent = data.totalQuantity || 0;
-        
-        // Garante a formatação de moeda brasileira
-        const valorTotal = data.totalValue || 0;
-        document.getElementById('metricValue').textContent = data.totalValueFormatted || 
-            valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-        document.getElementById('metricLowStock').textContent = data.lowStockCount || 0;
-
-        // Atualiza a lista visual de mudanças recentes
+        // Atualiza o componente visual de mudanças recentes (se houver dados)
         updateRecentChanges();
     } catch (error) {
         console.error('Erro ao inicializar dashboard:', error);
-        // Fallback: Se a rota de dashboard falhar, tentamos carregar via produtos
-        loadProducts();
+        showMessage('Erro ao atualizar métricas do dashboard', 'error');
     }
 }
-
 // ========================================
 // NAVEGAÇÃO E UI
 // ========================================
