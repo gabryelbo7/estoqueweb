@@ -116,7 +116,9 @@ const createProduct = async (req, res) => {
         // ========================================
         // INSERT + LOG + MOVIMENTAÇÃO (em paralelo)
         // ========================================
-        
+
+        await dbRun('BEGIN TRANSACTION');
+
         // 1️⃣ Inserir produto
         const insertResult = await dbRun(
             'INSERT INTO products (name, quantity, price, store_id) VALUES (?, ?, ?, ?)',
@@ -125,7 +127,7 @@ const createProduct = async (req, res) => {
 
         const productId = insertResult.lastID;
 
-        const stockMovementPromise = quantity > 0
+        const movementPromise = quantity > 0
             ? dbRun(
                 'INSERT INTO stock_movements (product_id, type, quantity) VALUES (?, ?, ?)',
                 [productId, 'IN', quantity]
@@ -141,10 +143,8 @@ const createProduct = async (req, res) => {
             { name: name.trim(), quantity, price }
         );
 
-        const results = await Promise.allSettled([stockMovementPromise, auditPromise]);
-        results
-            .filter((result) => result.status === 'rejected')
-            .forEach((result) => console.error('⚠️ Erro assíncrono pós-criação:', result.reason?.message || result.reason));
+        await Promise.all([movementPromise, auditPromise]);
+        await dbRun('COMMIT');
 
         res.status(201).json({
             success: true,
@@ -157,17 +157,8 @@ const createProduct = async (req, res) => {
             }
         });
     } catch (err) {
+        await dbRun('ROLLBACK').catch(() => {});
         console.error('❌ Erro ao criar produto:', err.message);
-        
-        // Verificar se é erro de constraint de banco de dados
-        if (err.message.includes('UNIQUE constraint failed')) {
-            return res.status(409).json({ 
-                success: false,
-                error: 'Já existe um produto com este nome.',
-                code: 'DUPLICATE_PRODUCT'
-            });
-        }
-
         res.status(500).json({ 
             success: false,
             error: err.message,
@@ -201,24 +192,38 @@ const updateProduct = async (req, res) => {
             });
         }
 
-        const product = await dbGet(
+        // Usamos BEGIN IMMEDIATE para garantir exclusividade de escrita no SQLite
+        await dbRun('BEGIN IMMEDIATE TRANSACTION');
+
+        const productBefore = await dbGet(
             'SELECT quantity FROM products WHERE id = ? AND store_id = ?', 
             [productId, req.user.store_id]
         );
 
-        if (!product) return res.status(404).json({ success: false, error: 'Produto não encontrado.' });
+        if (!productBefore) {
+            await dbRun('ROLLBACK');
+            return res.status(404).json({ success: false, error: 'Produto não encontrado.' });
+        }
 
-        const newQuantity = type === 'IN' ? product.quantity + quantity : product.quantity - quantity;
+        // ✅ SOLUÇÃO SENIOR: Update Atômico no SQL para evitar Race Condition
+        const updateSql = type === 'IN' 
+            ? 'UPDATE products SET quantity = quantity + ? WHERE id = ? AND store_id = ?'
+            : 'UPDATE products SET quantity = quantity - ? WHERE id = ? AND store_id = ? AND quantity >= ?';
+        
+        const updateParams = type === 'IN' 
+            ? [quantity, productId, req.user.store_id]
+            : [quantity, productId, req.user.store_id, quantity];
 
-        if (newQuantity < 0) {
+        const updateResult = await dbRun(updateSql, updateParams);
+
+        if (updateResult.changes === 0 && type === 'OUT') {
+            await dbRun('ROLLBACK');
             return res.status(400).json({ success: false, error: 'Estoque insuficiente para esta saída.' });
         }
 
-        const [updateResult] = await Promise.all([
-            dbRun(
-                'UPDATE products SET quantity = ? WHERE id = ?',
-                [newQuantity, productId]
-            ),
+        const newQuantity = type === 'IN' ? productBefore.quantity + quantity : productBefore.quantity - quantity;
+
+        await Promise.all([
             dbRun(
                 'INSERT INTO stock_movements (product_id, type, quantity) VALUES (?, ?, ?)',
                 [productId, type, quantity]
@@ -228,10 +233,12 @@ const updateProduct = async (req, res) => {
                 'UPDATE',
                 'products',
                 productId,
-                { quantity: product.quantity },
+                { quantity: productBefore.quantity },
                 { quantity: newQuantity }
             )
         ]);
+
+        await dbRun('COMMIT');
 
         res.json({ 
             success: true,
@@ -244,6 +251,7 @@ const updateProduct = async (req, res) => {
             }
         });
     } catch (err) {
+        await dbRun('ROLLBACK').catch(() => {});
         console.error('❌ Erro ao atualizar produto:', err.message);
         res.status(500).json({ 
             success: false,
@@ -279,15 +287,17 @@ const deleteProduct = async (req, res) => {
             });
         }
 
+        // ========================================
+        // DELETE + LOG (em paralelo)
+        // ========================================
+        await dbRun('BEGIN TRANSACTION');
+
         const oldValues = {
             name: product.name,
             quantity: product.quantity,
             price: product.price
         };
 
-        // ========================================
-        // DELETE + LOG (em paralelo)
-        // ========================================
         const [deleteResult] = await Promise.all([
             dbRun(
                 'DELETE FROM products WHERE id = ?',
@@ -303,6 +313,8 @@ const deleteProduct = async (req, res) => {
             )
         ]);
 
+        await dbRun('COMMIT');
+
         res.json({ 
             success: true,
             message: 'Produto excluído com sucesso',
@@ -312,6 +324,7 @@ const deleteProduct = async (req, res) => {
             }
         });
     } catch (err) {
+        await dbRun('ROLLBACK').catch(() => {});
         console.error('❌ Erro ao excluir produto:', err.message);
         res.status(500).json({ 
             success: false,

@@ -134,6 +134,12 @@ const initializeDatabase = async () => {
         });
         console.log('✓ Usuário funcionário criado: funcionario / func123 (employee, store_id: 1)');
 
+        // Criar índices para performance
+        await dbRun(`CREATE INDEX IF NOT EXISTS idx_products_store_id ON products(store_id)`);
+        await dbRun(`CREATE INDEX IF NOT EXISTS idx_products_name ON products(name)`);
+        await dbRun(`CREATE INDEX IF NOT EXISTS idx_users_store_id ON users(store_id)`);
+        console.log('✓ Índices de performance criados');
+
     } catch (err) {
         console.error('Erro ao inicializar banco de dados:', err.message);
     }
