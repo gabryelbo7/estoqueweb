@@ -5,7 +5,7 @@ const { db, dbRun, dbGet, dbAll } = require('./database');
 const productRoutes = require('./routes/productRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const authRoutes = require('./routes/authRoutes');
-const { authenticateToken, requireAdmin, requireEmployee } = require('./middleware/auth');
+const { authenticateToken, requireAdmin, requireEmployee, protectAdminPage, protectEmployeePage } = require('./middleware/auth');
 const { globalErrorHandler } = require('./middleware/errorHandler');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('./controllers/authController');
@@ -37,9 +37,6 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-
-// Servir arquivos estáticos do frontend (pasta raiz)
-app.use(express.static(path.join(__dirname)));
 
 // ========================================
 // MIDDLEWARE DE VERIFICAÇÃO DE TOKEN (Cookies)
@@ -165,6 +162,12 @@ app.get('/employee.html', protectEmployeePage, (req, res) => {
     console.log(`✓ Usuário ${req.user.username} (${req.user.role}) acessou /employee.html`);
     res.sendFile(path.join(__dirname, 'employee.html'));
 });
+
+// ========================================
+// ARQUIVOS ESTÁTICOS (Públicos)
+// ========================================
+// Movido para baixo para garantir que as rotas HTML protegidas acima tenham prioridade
+app.use(express.static(path.join(__dirname)));
 
 /**
  * ✅ PÚBLICO: Rotas públicas

@@ -31,6 +31,30 @@ const authenticateToken = (req, res, next) => {
 };
 
 /**
+ * Middleware para proteger rotas de admin (Páginas HTML)
+ * Redireciona para login se não autenticado ou role inválido
+ */
+const protectAdminPage = (req, res, next) => {
+    if (!req.user || req.user.role !== 'admin') {
+        console.warn(`⚠️  Tentativa de acesso não autorizado a recurso admin: ${req.ip}`);
+        return res.redirect('/login.html?error=admin_only');
+    }
+    next();
+};
+
+/**
+ * Middleware para proteger rotas de funcionário (Páginas HTML)
+ * Redireciona para login se não autenticado
+ */
+const protectEmployeePage = (req, res, next) => {
+    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'employee')) {
+        console.warn(`⚠️  Tentativa de acesso não autorizado a recurso employee: ${req.ip}`);
+        return res.redirect('/login.html?error=employee_only');
+    }
+    next();
+};
+
+/**
  * Middleware para verificar se o usuário é admin
  * Deve ser usado após authenticateToken
  */
@@ -77,6 +101,8 @@ const requireEmployeeOnly = (req, res, next) => {
 
 module.exports = {
     authenticateToken,
+    protectAdminPage,
+    protectEmployeePage,
     requireAdmin,
     requireEmployee,
     requireEmployeeOnly

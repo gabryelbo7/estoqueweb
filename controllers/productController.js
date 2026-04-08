@@ -177,58 +177,43 @@ const createProduct = async (req, res) => {
 };
 
 /**
- * Atualizar quantidade de um produto
- * Usa Promise.all para executar UPDATE + LOG + MOVIMENTAÇÃO em paralelo
- * @param {object} req - Requisição Express (params: id, body: quantity)
- * @param {object} res - Resposta Express
+ * Realizar movimentação de estoque (Entrada/Saída)
+ * @param {object} req - Requisição Express (params: id, body: type, quantity)
  */
 const updateProduct = async (req, res) => {
     try {
-        const { quantity: newQuantity } = req.body;
+        const { type, quantity } = req.body; // type: 'IN' ou 'OUT'
         const productId = req.params.id;
 
-        // ========================================
-        // VALIDAÇÕES
-        // ========================================
-        if (typeof newQuantity !== 'number' || newQuantity < 0) {
+        if (!['IN', 'OUT'].includes(type)) {
             return res.status(400).json({ 
                 success: false,
-                error: 'Quantidade deve ser um número maior ou igual a 0.',
+                error: 'Tipo de movimentação inválido. Use IN ou OUT.',
+                code: 'INVALID_MOVEMENT_TYPE'
+            });
+        }
+
+        if (typeof quantity !== 'number' || quantity <= 0) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'A quantidade deve ser um número positivo.',
                 code: 'INVALID_QUANTITY'
             });
         }
 
-        // ========================================
-        // BUSCAR PRODUTO
-        // ========================================
         const product = await dbGet(
             'SELECT quantity FROM products WHERE id = ? AND store_id = ?', 
             [productId, req.user.store_id]
         );
-        
-        if (!product) {
-            return res.status(404).json({ 
-                success: false,
-                error: 'Produto não encontrado nesta loja.',
-                code: 'PRODUCT_NOT_FOUND'
-            });
+
+        if (!product) return res.status(404).json({ success: false, error: 'Produto não encontrado.' });
+
+        const newQuantity = type === 'IN' ? product.quantity + quantity : product.quantity - quantity;
+
+        if (newQuantity < 0) {
+            return res.status(400).json({ success: false, error: 'Estoque insuficiente para esta saída.' });
         }
 
-        const currentQuantity = product.quantity;
-        const difference = newQuantity - currentQuantity;
-
-        // Se quantidade é igual, retornar sucesso
-        if (difference === 0) {
-            return res.json({ 
-                success: true,
-                message: 'Quantidade já está atualizada.',
-                changes: 0 
-            });
-        }
-
-        // ========================================
-        // UPDATE + LOG + MOVIMENTAÇÃO (em paralelo)
-        // ========================================
         const [updateResult] = await Promise.all([
             dbRun(
                 'UPDATE products SET quantity = ? WHERE id = ?',
@@ -236,26 +221,25 @@ const updateProduct = async (req, res) => {
             ),
             dbRun(
                 'INSERT INTO stock_movements (product_id, type, quantity) VALUES (?, ?, ?)',
-                [productId, difference > 0 ? 'IN' : 'OUT', Math.abs(difference)]
+                [productId, type, quantity]
             ),
             logAudit(
                 req.user.id,
                 'UPDATE',
                 'products',
                 productId,
-                { quantity: currentQuantity },
+                { quantity: product.quantity },
                 { quantity: newQuantity }
             )
         ]);
 
-        // ✅ Responder com todos os dados
         res.json({ 
             success: true,
-            message: 'Quantidade atualizada com sucesso',
+            message: `Movimentação de ${type === 'IN' ? 'entrada' : 'saída'} realizada.`,
             data: {
                 id: productId,
                 newQuantity,
-                difference,
+                movement: quantity,
                 changes: updateResult.changes
             }
         });
