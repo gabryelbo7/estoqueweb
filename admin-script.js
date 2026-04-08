@@ -107,6 +107,42 @@ function showPage(pageName) {
 }
 
 // ========================================
+// DASHBOARD - INICIALIZAÇÃO E FETCH
+// ========================================
+
+async function initDashboard() {
+    try {
+        // Busca dados consolidados da rota de dashboard
+        const response = await fetch('/api/dashboard', {
+            headers: getAuthHeaders()
+        });
+
+        if (!response.ok) throw new Error('Falha ao carregar dados do dashboard');
+
+        const result = await response.json();
+        const data = result.data;
+
+        // Atualiza os cards com os dados vindos da API
+        document.getElementById('metricTotal').textContent = data.totalProducts || 0;
+        document.getElementById('metricQuantity').textContent = data.totalQuantity || 0;
+        
+        // Garante a formatação de moeda brasileira
+        const valorTotal = data.totalValue || 0;
+        document.getElementById('metricValue').textContent = data.totalValueFormatted || 
+            valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        document.getElementById('metricLowStock').textContent = data.lowStockCount || 0;
+
+        // Atualiza a lista visual de mudanças recentes
+        updateRecentChanges();
+    } catch (error) {
+        console.error('Erro ao inicializar dashboard:', error);
+        // Fallback: Se a rota de dashboard falhar, tentamos carregar via produtos
+        loadProducts();
+    }
+}
+
+// ========================================
 // NAVEGAÇÃO E UI
 // ========================================
 
