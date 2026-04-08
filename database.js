@@ -14,58 +14,33 @@ const db = new sqlite3.Database(dbPath, (err) => {
 });
 
 /**
- * Promisifica db.run()
- * @param {string} sql - Comando SQL a executar
- * @param {array} params - Parâmetros para a query
- * @returns {Promise<{lastID: number, changes: number}>}
+ * Retorna uma função que promissifica um método do sqlite3 Database.
+ * @param {'get'|'all'|'run'} method
+ * @returns {(sql: string, params?: any[]) => Promise<any>}
  */
-const dbRun = (sql, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.run(sql, params, function (err) {
-            if (err) {
-                reject(err);
-            } else {
-                resolve({ lastID: this.lastID, changes: this.changes });
-            }
+const promisifyDbMethod = (method) => {
+    return (sql, params = []) => {
+        return new Promise((resolve, reject) => {
+            const callback = function (err, result) {
+                if (err) {
+                    return reject(err);
+                }
+
+                if (method === 'run') {
+                    return resolve({ lastID: this.lastID, changes: this.changes });
+                }
+
+                return resolve(result);
+            };
+
+            db[method](sql, params, callback);
         });
-    });
+    };
 };
 
-/**
- * Promisifica db.get()
- * @param {string} sql - Comando SQL a executar
- * @param {array} params - Parâmetros para a query
- * @returns {Promise<object>}
- */
-const dbGet = (sql, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.get(sql, params, (err, row) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(row);
-            }
-        });
-    });
-};
-
-/**
- * Promisifica db.all()
- * @param {string} sql - Comando SQL a executar
- * @param {array} params - Parâmetros para a query
- * @returns {Promise<array>}
- */
-const dbAll = (sql, params = []) => {
-    return new Promise((resolve, reject) => {
-        db.all(sql, params, (err, rows) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(rows || []);
-            }
-        });
-    });
-};
+const dbRun = promisifyDbMethod('run');
+const dbGet = promisifyDbMethod('get');
+const dbAll = promisifyDbMethod('all');
 
 /**
  * Inicializa o banco de dados criando tabelas padrão

@@ -10,13 +10,8 @@ const { dbRun, dbGet, dbAll } = require('../database');
  * @param {object} newValues - Valores novos (para CREATE/UPDATE)
  */
 const logAudit = async (userId, action, tableName, recordId, oldValues = null, newValues = null) => {
-    try {
-        const sql = 'INSERT INTO audit_logs (user_id, action, table_name, record_id, old_values, new_values) VALUES (?, ?, ?, ?, ?, ?)';
-        await dbRun(sql, [userId, action, tableName, recordId, JSON.stringify(oldValues), JSON.stringify(newValues)]);
-    } catch (err) {
-        console.error('⚠️ Erro ao registrar log de auditoria:', err.message);
-        // Não rejeita a promise para não interromper o fluxo
-    }
+    const sql = 'INSERT INTO audit_logs (user_id, action, table_name, record_id, old_values, new_values) VALUES (?, ?, ?, ?, ?, ?)';
+    return dbRun(sql, [userId, action, tableName, recordId, JSON.stringify(oldValues), JSON.stringify(newValues)]);
 };
 
 /**
@@ -130,12 +125,11 @@ const createProduct = async (req, res) => {
 
         const productId = insertResult.lastID;
 
-        // 2️⃣ Registrar movimentação e log em paralelo, sem bloquear a resposta
         const stockMovementPromise = quantity > 0
             ? dbRun(
                 'INSERT INTO stock_movements (product_id, type, quantity) VALUES (?, ?, ?)',
                 [productId, 'IN', quantity]
-            ).catch(err => console.error('⚠️ Erro ao registrar movimentação:', err.message))
+            )
             : Promise.resolve();
 
         const auditPromise = logAudit(
@@ -147,14 +141,11 @@ const createProduct = async (req, res) => {
             { name: name.trim(), quantity, price }
         );
 
-        Promise.allSettled([stockMovementPromise, auditPromise]).then(results => {
-            const failed = results.filter(r => r.status === 'rejected');
-            if (failed.length > 0) {
-                failed.forEach(r => console.error('⚠️ Erro assíncrono pós-criação:', r.reason?.message || r.reason));
-            }
-        });
+        const results = await Promise.allSettled([stockMovementPromise, auditPromise]);
+        results
+            .filter((result) => result.status === 'rejected')
+            .forEach((result) => console.error('⚠️ Erro assíncrono pós-criação:', result.reason?.message || result.reason));
 
-        // ✅ Responder ao cliente imediatamente
         res.status(201).json({
             success: true,
             message: 'Produto adicionado com sucesso',
@@ -239,19 +230,14 @@ const updateProduct = async (req, res) => {
         // UPDATE + LOG + MOVIMENTAÇÃO (em paralelo)
         // ========================================
         const [updateResult] = await Promise.all([
-            // 1️⃣ UPDATE da quantidade
             dbRun(
                 'UPDATE products SET quantity = ? WHERE id = ?',
                 [newQuantity, productId]
             ),
-            
-            // 2️⃣ INSERT de movimentação
             dbRun(
                 'INSERT INTO stock_movements (product_id, type, quantity) VALUES (?, ?, ?)',
                 [productId, difference > 0 ? 'IN' : 'OUT', Math.abs(difference)]
             ),
-            
-            // 3️⃣ LOG de auditoria (fire-and-forget)
             logAudit(
                 req.user.id,
                 'UPDATE',
@@ -259,7 +245,7 @@ const updateProduct = async (req, res) => {
                 productId,
                 { quantity: currentQuantity },
                 { quantity: newQuantity }
-            ).catch(err => console.error('⚠️ Erro ao registrar log:', err.message))
+            )
         ]);
 
         // ✅ Responder com todos os dados
@@ -319,13 +305,10 @@ const deleteProduct = async (req, res) => {
         // DELETE + LOG (em paralelo)
         // ========================================
         const [deleteResult] = await Promise.all([
-            // 1️⃣ DELETE do produto
             dbRun(
                 'DELETE FROM products WHERE id = ?',
                 [productId]
             ),
-            
-            // 2️⃣ LOG de auditoria (fire-and-forget)
             logAudit(
                 req.user.id,
                 'DELETE',
@@ -333,7 +316,7 @@ const deleteProduct = async (req, res) => {
                 productId,
                 oldValues,
                 null
-            ).catch(err => console.error('⚠️ Erro ao registrar log:', err.message))
+            )
         ]);
 
         res.json({ 
