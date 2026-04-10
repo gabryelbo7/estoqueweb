@@ -74,56 +74,6 @@ app.use((req, res, next) => {
     });
     next();
 });
-
-// ========================================
-// MIDDLEWARE PARA PROTEGER PÁGINAS HTML
-// ========================================
-
-/**
- * Middleware para proteger rotas de admin
- * Redireciona para login se não autenticado ou role inválido
- * @security Verifica token e role antes de servir página sensível
- */
-const protectAdminPage = (req, res, next) => {
-    if (!req.user || req.user.role !== 'admin') {
-        console.warn(`⚠️  Tentativa de acesso não autorizado a recurso admin: ${req.ip}`);
-        return res.redirect('/login.html?error=admin_only');
-    }
-    next();
-};
-
-/**
- * Middleware para proteger rotas de funcionário/employee
- * Redireciona para login se não autenticado ou role inválido
- * @security Verifica token e role antes de servir página sensível
- */
-const protectEmployeePage = (req, res, next) => {
-    if (!req.user || (req.user.role !== 'admin' && req.user.role !== 'employee')) {
-        console.warn(`⚠️  Tentativa de acesso não autorizado a recurso employee: ${req.ip}`);
-        return res.redirect('/login.html?error=employee_only');
-    }
-    next();
-};
-
-/**
- * Middleware para proteger arquivos HTML sensíveis (como index.html)
- * Bloqueia acesso a páginas admin/employee através de arquivos estáticos
- * @security Impede acesso a painéis sem autenticação
- */
-const protectSensitivePages = (req, res, next) => {
-    // Lista de arquivos sensíveis que requerem autenticação
-    const sensitiveFiles = ['index.html', 'admin.html', 'employee.html'];
-    
-    // Verificar se a requisição é para um arquivo sensível
-    if (sensitiveFiles.some(file => req.path.includes(file))) {
-        if (!req.user) {
-            console.warn(`⚠️  Tentativa de acesso a arquivo protegido sem autenticação: ${req.path} (${req.ip})`);
-            return res.redirect('/login.html?error=unauthorized');
-        }
-    }
-    next();
-};
-
 // ========================================
 // ROTAS DE PÁGINAS PROTEGIDAS
 // ========================================
@@ -163,12 +113,6 @@ app.get('/employee.html', protectEmployeePage, (req, res) => {
     res.sendFile(path.join(__dirname, 'employee.html'));
 });
 
-// ========================================
-// ARQUIVOS ESTÁTICOS (Públicos)
-// ========================================
-// Movido para baixo para garantir que as rotas HTML protegidas acima tenham prioridade
-app.use(express.static(path.join(__dirname)));
-
 /**
  * ✅ PÚBLICO: Rotas públicas
  */
@@ -201,6 +145,12 @@ app.get('/login.html', (req, res) => {
     }
     res.sendFile(path.join(__dirname, 'login.html'));
 });
+
+// ========================================
+// ARQUIVOS ESTÁTICOS (Ativos: CSS, JS, Imagens)
+// ========================================
+// Posicionado após rotas protegidas para evitar bypass em arquivos .html
+app.use(express.static(path.join(__dirname)));
 
 // ========================================
 // ROTAS DA API

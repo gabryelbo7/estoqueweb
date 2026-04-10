@@ -61,10 +61,10 @@ const login = async (req, res) => {
 
         // Enviar token em cookie HTTP-only (seguro contra XSS)
         res.cookie('token', token, {
-            httpOnly: true,    // Não acessível via JavaScript
-            secure: process.env.NODE_ENV === 'production',  // HTTPS em produção
-            sameSite: 'strict', // Proteção contra CSRF
-            maxAge: 24 * 60 * 60 * 1000 // 24 horas
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 24 * 60 * 60 * 1000
         });
 
         res.json({

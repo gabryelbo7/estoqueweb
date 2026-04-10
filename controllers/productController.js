@@ -117,7 +117,7 @@ const createProduct = async (req, res) => {
         // INSERT + LOG + MOVIMENTAÇÃO (em paralelo)
         // ========================================
 
-        await dbRun('BEGIN TRANSACTION');
+        await dbRun('BEGIN IMMEDIATE TRANSACTION');
 
         // 1️⃣ Inserir produto
         const insertResult = await dbRun(
@@ -192,7 +192,7 @@ const updateProduct = async (req, res) => {
             });
         }
 
-        // Usamos BEGIN IMMEDIATE para garantir exclusividade de escrita no SQLite
+        // Atomicidade: trava o banco para escrita e evita Race Conditions
         await dbRun('BEGIN IMMEDIATE TRANSACTION');
 
         const productBefore = await dbGet(
@@ -205,7 +205,7 @@ const updateProduct = async (req, res) => {
             return res.status(404).json({ success: false, error: 'Produto não encontrado.' });
         }
 
-        // ✅ SOLUÇÃO SENIOR: Update Atômico no SQL para evitar Race Condition
+        // Cálculo feito via SQL para garantir consistência sob concorrência
         const updateSql = type === 'IN' 
             ? 'UPDATE products SET quantity = quantity + ? WHERE id = ? AND store_id = ?'
             : 'UPDATE products SET quantity = quantity - ? WHERE id = ? AND store_id = ? AND quantity >= ?';
@@ -290,7 +290,7 @@ const deleteProduct = async (req, res) => {
         // ========================================
         // DELETE + LOG (em paralelo)
         // ========================================
-        await dbRun('BEGIN TRANSACTION');
+        await dbRun('BEGIN IMMEDIATE TRANSACTION');
 
         const oldValues = {
             name: product.name,
